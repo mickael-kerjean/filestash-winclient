@@ -18,8 +18,8 @@ BOOL WINAPI ctrlHandler(DWORD ctrl_type);
 
 int wmain(int argc, wchar_t* argv[]) {
     Args args;
-    if (!ParseArgs(argc, argv, &args)) {
-        PrintUsage(argv[0]);
+    if (!parseArgs(argc, argv, &args)) {
+        printUsage(argv[0]);
         return 1;
     }
 
@@ -45,7 +45,6 @@ int wmain(int argc, wchar_t* argv[]) {
 bool parseArgs(int argc, wchar_t* argv[], Args* args) {
     for (int index = 1; index < argc; ++index) {
         const std::wstring arg = argv[index];
-
         if (arg == L"--url" && index + 1 < argc) {
             args->url = argv[++index];
         } else if (arg == L"--token" && index + 1 < argc) {
@@ -54,7 +53,6 @@ bool parseArgs(int argc, wchar_t* argv[], Args* args) {
             args->sync_root = argv[++index];
         }
     }
-
     return !args->url.empty() && !args->token.empty() && !args->sync_root.empty();
 }
 
