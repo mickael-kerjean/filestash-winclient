@@ -62,7 +62,30 @@ CloudProvider::~CloudProvider() {
 }
 
 void CloudProvider::RegisterSyncRoot() {
-    std::wcout << L"RegisterSyncRoot not implemented yet for " << sync_root_ << std::endl;
+    CF_SYNC_REGISTRATION registration = {};
+    registration.StructSize = sizeof(CF_SYNC_REGISTRATION);
+    registration.ProviderName = L"Filestash";
+    registration.ProviderVersion = L"1.0";
+
+    CF_SYNC_POLICIES policies = {};
+    policies.StructSize = sizeof(CF_SYNC_POLICIES);
+    policies.Hydration.Primary = CF_HYDRATION_POLICY_FULL;
+    policies.Population.Primary = CF_POPULATION_POLICY_FULL;
+
+    HRESULT hr = CfRegisterSyncRoot(
+        sync_root_.c_str(),
+        &registration,
+        &policies,
+        CF_REGISTER_FLAG_NONE);
+
+    if (FAILED(hr)) {
+        throw std::runtime_error("Failed to register sync root");
+    }
+    std::wcout << L"Sync root registered: " << sync_root_ << std::endl;
+}
+
+void CloudProvider::UnregisterSyncRoot() {
+    CfUnregisterSyncRoot(sync_root_.c_str());
 }
 
 void CloudProvider::Connect() {
@@ -137,6 +160,10 @@ void CALLBACK CloudProvider::OnFetchPlaceholders(
     auto* provider = static_cast<CloudProvider*>(callback_info->CallbackContext);
     std::wcout << L"FETCH_PLACEHOLDERS path=" << callback_info->NormalizedPath << std::endl;
 
+    std::wstring relative_path = RelativePathFromFullPath(
+        provider->sync_root_, callback_info->NormalizedPath);
+    provider->PopulateNamespace(relative_path);
+
     CF_OPERATION_INFO op_info = {};
     op_info.StructSize = sizeof(op_info);
     op_info.Type = CF_OPERATION_TYPE_TRANSFER_PLACEHOLDERS;
@@ -146,9 +173,9 @@ void CALLBACK CloudProvider::OnFetchPlaceholders(
     CF_OPERATION_PARAMETERS op_params = {};
     op_params.ParamSize = sizeof(op_params);
     op_params.TransferPlaceholders.CompletionStatus = STATUS_SUCCESS;
+    op_params.TransferPlaceholders.Flags = CF_OPERATION_TRANSFER_PLACEHOLDERS_FLAG_DISABLE_ON_DEMAND_POPULATION;
     op_params.TransferPlaceholders.PlaceholderTotalCount.QuadPart = 0;
 
-    (void)provider;
     (void)CfExecute(&op_info, &op_params);
 }
 
@@ -159,6 +186,67 @@ void CALLBACK CloudProvider::OnCancelFetchData(
     auto* provider = static_cast<CloudProvider*>(callback_info->CallbackContext);
     std::wcout << L"CANCEL_FETCH_DATA path=" << callback_info->NormalizedPath << std::endl;
     provider->PersistEvent(callback_info->NormalizedPath, Event{EventType::HydrationFailed, L"", L"Fetch cancelled"});
+}
+
+void CloudProvider::PopulateNamespace(const std::wstring& relative_path) {
+    std::wstring remote_path = ToRemotePath(relative_path);
+    auto entries = client_.ListDirectory(remote_path);
+
+    std::wstring local_dir = sync_root_;
+    if (!relative_path.empty()) {
+        local_dir += L"\\" + relative_path;
+    }
+
+    std::vector<std::wstring> names;
+    std::vector<CF_PLACEHOLDER_CREATE_INFO> placeholders;
+    names.reserve(entries.size());
+    placeholders.reserve(entries.size());
+
+    FILETIME now;
+    GetSystemTimeAsFileTime(&now);
+    LARGE_INTEGER timestamp;
+    timestamp.LowPart = now.dwLowDateTime;
+    timestamp.HighPart = now.dwHighDateTime;
+
+    for (const auto& entry : entries) {
+        names.push_back(entry.name);
+
+        CF_PLACEHOLDER_CREATE_INFO ph = {};
+        ph.RelativeFileName = names.back().c_str();
+        ph.FsMetadata.BasicInfo.CreationTime = timestamp;
+        ph.FsMetadata.BasicInfo.LastWriteTime = timestamp;
+        ph.FsMetadata.BasicInfo.LastAccessTime = timestamp;
+        ph.FsMetadata.BasicInfo.ChangeTime = timestamp;
+        ph.Flags = CF_PLACEHOLDER_CREATE_FLAG_NONE;
+
+        if (entry.is_directory) {
+            ph.FsMetadata.BasicInfo.FileAttributes = FILE_ATTRIBUTE_DIRECTORY;
+            ph.FsMetadata.FileSize.QuadPart = 0;
+        } else {
+            ph.FsMetadata.BasicInfo.FileAttributes = FILE_ATTRIBUTE_NORMAL;
+            ph.FsMetadata.FileSize.QuadPart = static_cast<LONGLONG>(entry.size);
+        }
+
+        placeholders.push_back(ph);
+    }
+
+    if (placeholders.empty()) {
+        return;
+    }
+
+    DWORD processed = 0;
+    HRESULT hr = CfCreatePlaceholders(
+        local_dir.c_str(),
+        placeholders.data(),
+        static_cast<DWORD>(placeholders.size()),
+        CF_CREATE_FLAG_NONE,
+        &processed);
+
+    if (FAILED(hr)) {
+        std::wcerr << L"Failed to create placeholders in " << local_dir << std::endl;
+    } else {
+        std::wcout << L"Created " << processed << L" placeholders in " << local_dir << std::endl;
+    }
 }
 
 FileState CloudProvider::LoadOrCreateState(const std::wstring& local_path, const std::wstring& remote_path) {

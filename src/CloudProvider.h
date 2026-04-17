@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <cfapi.h>
 #include <string>
+#include <vector>
 
 class CloudProvider {
 public:
@@ -17,8 +18,10 @@ public:
     ~CloudProvider();
 
     void RegisterSyncRoot();
+    void UnregisterSyncRoot();
     void Connect();
     void Disconnect();
+    void PopulateNamespace(const std::wstring& relative_path);
 
 private:
     static void CALLBACK OnFetchData(

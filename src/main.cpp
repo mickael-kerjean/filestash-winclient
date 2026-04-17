@@ -32,13 +32,15 @@ int wmain(int argc, wchar_t* argv[]) {
     MemoryStateStore store;
     CloudProvider provider(client, store, sync_root);
 
+    provider.RegisterSyncRoot();
+    provider.Connect();
+    provider.PopulateNamespace(L"");
+
     g_stop_event = CreateEvent(NULL, TRUE, FALSE, NULL);
     SetConsoleCtrlHandler(ctrlHandler, TRUE);
 
-    std::wcout << L"filestash-cfapi scaffold" << std::endl;
     std::wcout << L"backend=" << client.base_url() << std::endl;
     std::wcout << L"sync-root=" << sync_root << std::endl;
-    std::wcout << L"state-store=memory (SQLite planned)" << std::endl;
     std::wcout << L"Press Ctrl+C to stop." << std::endl;
 
     WaitForSingleObject(g_stop_event, INFINITE);
