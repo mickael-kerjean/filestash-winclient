@@ -4,36 +4,14 @@
 #include <memory>
 #include <string>
 
-namespace {
-
 struct Args {
     std::wstring url;
     std::wstring token;
     std::wstring sync_root;
 };
 
-bool ParseArgs(int argc, wchar_t* argv[], Args* args) {
-    for (int index = 1; index < argc; ++index) {
-        const std::wstring arg = argv[index];
-
-        if (arg == L"--url" && index + 1 < argc) {
-            args->url = argv[++index];
-        } else if (arg == L"--token" && index + 1 < argc) {
-            args->token = argv[++index];
-        } else if (arg == L"--sync-root" && index + 1 < argc) {
-            args->sync_root = argv[++index];
-        }
-    }
-
-    return !args->url.empty() && !args->token.empty() && !args->sync_root.empty();
-}
-
-void PrintUsage(const wchar_t* program_name) {
-    std::wcout << L"Usage: " << program_name
-               << L" --url URL --token TOKEN --sync-root PATH" << std::endl;
-}
-
-}  // namespace
+bool parseArgs(int argc, wchar_t* argv[], Args* args);
+void printUsage(const wchar_t* program_name);
 
 int wmain(int argc, wchar_t* argv[]) {
     Args args;
@@ -52,4 +30,25 @@ int wmain(int argc, wchar_t* argv[]) {
     std::wcout << L"state-store=memory (SQLite planned)" << std::endl;
 
     return 0;
+}
+
+bool parseArgs(int argc, wchar_t* argv[], Args* args) {
+    for (int index = 1; index < argc; ++index) {
+        const std::wstring arg = argv[index];
+
+        if (arg == L"--url" && index + 1 < argc) {
+            args->url = argv[++index];
+        } else if (arg == L"--token" && index + 1 < argc) {
+            args->token = argv[++index];
+        } else if (arg == L"--sync-root" && index + 1 < argc) {
+            args->sync_root = argv[++index];
+        }
+    }
+
+    return !args->url.empty() && !args->token.empty() && !args->sync_root.empty();
+}
+
+void printUsage(const wchar_t* program_name) {
+    std::wcout << L"Usage: " << program_name
+               << L" --url URL --token TOKEN --sync-root PATH" << std::endl;
 }
