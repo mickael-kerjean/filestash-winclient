@@ -26,6 +26,25 @@ bool IsValidConnectionKey(const CF_CONNECTION_KEY& key) {
 }
 
 std::wstring RelativePathFromFullPath(const std::wstring& sync_root, const std::wstring& full_path) {
+    // Windows cfapi normalized paths omit the drive letter (e.g. \Users\... instead of C:\Users\...)
+    // Try matching with sync_root as-is first, then without the drive prefix
+    std::wstring roots[] = { sync_root };
+    if (sync_root.size() >= 2 && sync_root[1] == L':') {
+        roots[0] = sync_root;
+        // Also try without "C:" prefix
+        std::wstring no_drive = sync_root.substr(2);
+        for (const auto& root : {sync_root, no_drive}) {
+            if (full_path.rfind(root, 0) == 0) {
+                std::wstring relative = full_path.substr(root.size());
+                if (!relative.empty() && (relative.front() == L'\\' || relative.front() == L'/')) {
+                    relative.erase(relative.begin());
+                }
+                return relative;
+            }
+        }
+        return full_path;
+    }
+
     if (full_path.rfind(sync_root, 0) == 0) {
         std::wstring relative = full_path.substr(sync_root.size());
         if (!relative.empty() && (relative.front() == L'\\' || relative.front() == L'/')) {
@@ -246,7 +265,8 @@ void CloudProvider::PopulateNamespace(const std::wstring& relative_path) {
         &processed);
 
     if (FAILED(hr)) {
-        std::wcerr << L"Failed to create placeholders in " << local_dir << std::endl;
+        std::wcerr << L"Failed to create placeholders in " << local_dir
+                   << L" hr=0x" << std::hex << hr << std::dec << std::endl;
     } else {
         std::wcout << L"Created " << processed << L" placeholders in " << local_dir << std::endl;
     }
