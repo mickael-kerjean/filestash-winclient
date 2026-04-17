@@ -190,7 +190,10 @@ void CALLBACK CloudProvider::OnCancelFetchData(
 
 void CloudProvider::PopulateNamespace(const std::wstring& relative_path) {
     std::wstring remote_path = ToRemotePath(relative_path);
+    std::wcout << L"[POPULATE] relative=" << relative_path
+               << L" remote=" << remote_path << std::endl;
     auto entries = client_.ListDirectory(remote_path);
+    std::wcout << L"[POPULATE] got " << entries.size() << L" entries" << std::endl;
 
     std::wstring local_dir = sync_root_;
     if (!relative_path.empty()) {
