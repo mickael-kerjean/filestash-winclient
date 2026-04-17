@@ -175,5 +175,8 @@ FileState CloudProvider::LoadOrCreateState(const std::wstring& local_path, const
 void CloudProvider::PersistEvent(const std::wstring& local_path, const Event& event) {
     const std::wstring relative_path = RelativePathFromFullPath(sync_root_, local_path);
     FileState current = LoadOrCreateState(local_path, ToRemotePath(relative_path));
-    store_.Put(state_machine_.Apply(current, event));
+    FileState next = state_machine_.Apply(current, event);
+    std::wcout << L"[EVENT] type=" << static_cast<int>(event.type)
+               << L" path=" << relative_path << std::endl;
+    store_.Put(next);
 }
