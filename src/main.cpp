@@ -32,6 +32,7 @@ int wmain(int argc, wchar_t* argv[]) {
     MemoryStateStore store;
     CloudProvider provider(client, store, sync_root);
 
+    provider.UnregisterSyncRoot();
     provider.RegisterSyncRoot();
     provider.Connect();
     provider.PopulateNamespace(L"");
