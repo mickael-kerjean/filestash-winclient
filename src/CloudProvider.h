@@ -6,14 +6,13 @@
 
 #include <windows.h>
 #include <cfapi.h>
-#include <memory>
 #include <string>
 
 class CloudProvider {
 public:
     CloudProvider(
-        std::shared_ptr<FilestashClient> client,
-        std::shared_ptr<StateStore> store,
+        FilestashClient& client,
+        StateStore& store,
         std::wstring sync_root);
     ~CloudProvider();
 
@@ -37,8 +36,8 @@ private:
     FileState LoadOrCreateState(const std::wstring& local_path, const std::wstring& remote_path);
     void PersistEvent(const std::wstring& local_path, const Event& event);
 
-    std::shared_ptr<FilestashClient> client_;
-    std::shared_ptr<StateStore> store_;
+    FilestashClient& client_;
+    StateStore& store_;
     std::wstring sync_root_;
     CF_CONNECTION_KEY connection_key_{};
     StateMachine state_machine_;

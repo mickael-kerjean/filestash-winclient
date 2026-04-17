@@ -1,7 +1,7 @@
 #include "CloudProvider.h"
 
+#include <windows.h>
 #include <iostream>
-#include <memory>
 #include <string>
 
 struct Args {
@@ -10,8 +10,11 @@ struct Args {
     std::wstring sync_root;
 };
 
+HANDLE g_stop_event = NULL;
+
 bool parseArgs(int argc, wchar_t* argv[], Args* args);
 void printUsage(const wchar_t* program_name);
+BOOL WINAPI ctrlHandler(DWORD ctrl_type);
 
 int wmain(int argc, wchar_t* argv[]) {
     Args args;
@@ -20,14 +23,21 @@ int wmain(int argc, wchar_t* argv[]) {
         return 1;
     }
 
-    auto client = std::make_shared<FilestashClient>(args.url, args.token);
-    auto store = std::make_shared<MemoryStateStore>();
+    FilestashClient client(args.url, args.token);
+    MemoryStateStore store;
     CloudProvider provider(client, store, args.sync_root);
 
+    g_stop_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    SetConsoleCtrlHandler(ctrlHandler, TRUE);
+
     std::wcout << L"filestash-cfapi scaffold" << std::endl;
-    std::wcout << L"backend=" << client->base_url() << std::endl;
+    std::wcout << L"backend=" << client.base_url() << std::endl;
     std::wcout << L"sync-root=" << args.sync_root << std::endl;
     std::wcout << L"state-store=memory (SQLite planned)" << std::endl;
+    std::wcout << L"Press Ctrl+C to stop." << std::endl;
+
+    WaitForSingleObject(g_stop_event, INFINITE);
+    CloseHandle(g_stop_event);
 
     return 0;
 }
@@ -51,4 +61,13 @@ bool parseArgs(int argc, wchar_t* argv[], Args* args) {
 void printUsage(const wchar_t* program_name) {
     std::wcout << L"Usage: " << program_name
                << L" --url URL --token TOKEN --sync-root PATH" << std::endl;
+}
+
+BOOL WINAPI ctrlHandler(DWORD ctrl_type) {
+    if (ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT) {
+        std::wcout << L"\nShutting down..." << std::endl;
+        SetEvent(g_stop_event);
+        return TRUE;
+    }
+    return FALSE;
 }

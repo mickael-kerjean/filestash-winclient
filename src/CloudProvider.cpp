@@ -49,11 +49,11 @@ std::wstring ToRemotePath(const std::wstring& local_relative_path) {
 }  // namespace
 
 CloudProvider::CloudProvider(
-    std::shared_ptr<FilestashClient> client,
-    std::shared_ptr<StateStore> store,
+    FilestashClient& client,
+    StateStore& store,
     std::wstring sync_root)
-    : client_(std::move(client)),
-      store_(std::move(store)),
+    : client_(client),
+      store_(store),
       sync_root_(std::move(sync_root)),
       connection_key_(InvalidConnectionKey()) {}
 
@@ -110,7 +110,7 @@ void CALLBACK CloudProvider::OnFetchData(
                << L" length=" << callback_parameters->FetchData.RequiredLength.QuadPart
                << std::endl;
 
-    const auto content = provider->client_->ReadFile(remote_path);
+    const auto content = provider->client_.ReadFile(remote_path);
 
     CF_OPERATION_INFO op_info = {};
     op_info.StructSize = sizeof(op_info);
@@ -162,7 +162,7 @@ void CALLBACK CloudProvider::OnCancelFetchData(
 }
 
 FileState CloudProvider::LoadOrCreateState(const std::wstring& local_path, const std::wstring& remote_path) {
-    if (const auto existing = store_->Get(local_path)) {
+    if (const auto existing = store_.Get(local_path)) {
         return *existing;
     }
 
@@ -175,5 +175,5 @@ FileState CloudProvider::LoadOrCreateState(const std::wstring& local_path, const
 void CloudProvider::PersistEvent(const std::wstring& local_path, const Event& event) {
     const std::wstring relative_path = RelativePathFromFullPath(sync_root_, local_path);
     FileState current = LoadOrCreateState(local_path, ToRemotePath(relative_path));
-    store_->Put(state_machine_.Apply(current, event));
+    store_.Put(state_machine_.Apply(current, event));
 }
