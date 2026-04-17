@@ -252,24 +252,22 @@ void CloudProvider::PopulateNamespace(const std::wstring& relative_path) {
         placeholders.push_back(ph);
     }
 
-    if (placeholders.empty()) {
-        return;
-    }
+    DWORD total = 0;
+    for (auto& ph : placeholders) {
+        DWORD processed = 0;
+        HRESULT hr = CfCreatePlaceholders(
+            local_dir.c_str(),
+            &ph,
+            1,
+            CF_CREATE_FLAG_NONE,
+            &processed);
 
-    DWORD processed = 0;
-    HRESULT hr = CfCreatePlaceholders(
-        local_dir.c_str(),
-        placeholders.data(),
-        static_cast<DWORD>(placeholders.size()),
-        CF_CREATE_FLAG_NONE,
-        &processed);
-
-    if (FAILED(hr)) {
-        std::wcerr << L"Failed to create placeholders in " << local_dir
-                   << L" hr=0x" << std::hex << hr << std::dec << std::endl;
-    } else {
-        std::wcout << L"Created " << processed << L" placeholders in " << local_dir << std::endl;
+        if (SUCCEEDED(hr)) {
+            total += processed;
+        }
     }
+    std::wcout << L"[POPULATE] created " << total << L"/" << placeholders.size()
+               << L" placeholders in " << local_dir << std::endl;
 }
 
 FileState CloudProvider::LoadOrCreateState(const std::wstring& local_path, const std::wstring& remote_path) {
