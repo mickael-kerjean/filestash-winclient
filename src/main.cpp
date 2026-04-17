@@ -7,13 +7,13 @@
 struct Args {
     std::wstring url;
     std::wstring token;
-    std::wstring sync_root;
 };
 
 HANDLE g_stop_event = NULL;
 
 bool parseArgs(int argc, wchar_t* argv[], Args* args);
 void printUsage(const wchar_t* program_name);
+std::wstring getSyncRoot();
 BOOL WINAPI ctrlHandler(DWORD ctrl_type);
 
 int wmain(int argc, wchar_t* argv[]) {
@@ -23,16 +23,21 @@ int wmain(int argc, wchar_t* argv[]) {
         return 1;
     }
 
+    std::wstring sync_root = getSyncRoot();
+    if (sync_root.empty()) {
+        return 1;
+    }
+
     FilestashClient client(args.url, args.token);
     MemoryStateStore store;
-    CloudProvider provider(client, store, args.sync_root);
+    CloudProvider provider(client, store, sync_root);
 
     g_stop_event = CreateEvent(NULL, TRUE, FALSE, NULL);
     SetConsoleCtrlHandler(ctrlHandler, TRUE);
 
     std::wcout << L"filestash-cfapi scaffold" << std::endl;
     std::wcout << L"backend=" << client.base_url() << std::endl;
-    std::wcout << L"sync-root=" << args.sync_root << std::endl;
+    std::wcout << L"sync-root=" << sync_root << std::endl;
     std::wcout << L"state-store=memory (SQLite planned)" << std::endl;
     std::wcout << L"Press Ctrl+C to stop." << std::endl;
 
@@ -49,16 +54,34 @@ bool parseArgs(int argc, wchar_t* argv[], Args* args) {
             args->url = argv[++index];
         } else if (arg == L"--token" && index + 1 < argc) {
             args->token = argv[++index];
-        } else if (arg == L"--sync-root" && index + 1 < argc) {
-            args->sync_root = argv[++index];
         }
     }
-    return !args->url.empty() && !args->token.empty() && !args->sync_root.empty();
+    return !args->url.empty() && !args->token.empty();
 }
 
 void printUsage(const wchar_t* program_name) {
     std::wcout << L"Usage: " << program_name
-               << L" --url URL --token TOKEN --sync-root PATH" << std::endl;
+               << L" --url URL --token TOKEN" << std::endl;
+}
+
+std::wstring getSyncRoot() {
+    wchar_t user_profile[MAX_PATH];
+    DWORD len = GetEnvironmentVariableW(L"USERPROFILE", user_profile, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH) {
+        std::wcerr << L"Error: could not get USERPROFILE" << std::endl;
+        return L"";
+    }
+
+    std::wstring path = std::wstring(user_profile) + L"\\Filestash";
+    DWORD attrs = GetFileAttributesW(path.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        if (!CreateDirectoryW(path.c_str(), nullptr)) {
+            std::wcerr << L"Error: could not create " << path << std::endl;
+            return L"";
+        }
+    }
+
+    return path;
 }
 
 BOOL WINAPI ctrlHandler(DWORD ctrl_type) {
